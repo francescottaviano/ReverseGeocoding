@@ -2,22 +2,17 @@ package reversegeocoding.processors.reversegeocoding;
 
 import java.util.TimeZone;
 
+/**
+ * City class modeling cities provided by csv files
+ */
+
 public class City {
 
-    private String name;
+    private String city;
     private String lat;
     private String lon;
     private String country;
     private TimeZone timeZone;
-
-    public City(String name, String lat, String lon, String country, TimeZone timeZone) {
-        this.name = name;
-        this.lat = lat;
-        this.lon = lon;
-        this.country = country;
-        this.timeZone = timeZone;
-
-    }
 
     public City() {
     }
@@ -38,4 +33,28 @@ public class City {
         this.timeZone = timeZone;
     }
 
+    public String getCity() {
+        return city;
+    }
+
+    public void setCity(String city) {
+        this.city = city;
+    }
+
+    public void setLat(String lat) {
+        this.lat = lat;
+    }
+
+    public void setLon(String lon) {
+        this.lon = lon;
+    }
+
+
+    public String getCountry() {
+        return country;
+    }
+
+    public TimeZone getTimeZone() {
+        return timeZone;
+    }
 }
