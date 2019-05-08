@@ -30,13 +30,16 @@ import java.util.*;
  * It requires API Key as Property
  */
 
-@Tags({"jasmine", "geocode", "country"})
+@Tags({"jasmine", "reverse", "geocode", "country", "google", "places", "timezone"})
 @CapabilityDescription("Reverse Geocoding")
 @SeeAlso({})
 @ReadsAttributes({@ReadsAttribute(attribute="", description="")})
 @WritesAttributes({@WritesAttribute(attribute="", description="")})
 public class GoogleAPIProcessor extends AbstractProcessor {
 
+    /*
+    * Google API Key property is required to use Google services
+    * */
     public static final PropertyDescriptor GOOGLE_API_KEY_PROP = new PropertyDescriptor
             .Builder().name("GOOGLE_API_KEY_PROP")
             .displayName("Google API key")
@@ -83,7 +86,6 @@ public class GoogleAPIProcessor extends AbstractProcessor {
 
     @OnScheduled
     public void onScheduled(final ProcessContext context) {
-
     }
 
     @Override
@@ -95,7 +97,7 @@ public class GoogleAPIProcessor extends AbstractProcessor {
 
         /*
          * Reverse Geocoding Google service to provide
-         * country information from city name and coordinates.
+         * country and timezone information from city coordinates.
          */
 
         // Build GeoApiContext with API Key provided by Property value
@@ -113,7 +115,7 @@ public class GoogleAPIProcessor extends AbstractProcessor {
 
                 GeocodingResult[] geocodingResults;
                 geocodingResults = GeocodingApi.reverseGeocode(geoCont, coordinates).await();
-                String country = "";
+                String country;
 
                 for (int i = 0; i < geocodingResults[0].addressComponents.length; i++){
                     if (geocodingResults[0].addressComponents[i].types[0] == AddressComponentType.COUNTRY){
@@ -123,14 +125,11 @@ public class GoogleAPIProcessor extends AbstractProcessor {
                     }
                 }
 
-                TimeZone timeZone = TimeZoneApi.getTimeZone(geoCont, coordinates).await();
-
                 // Set time zone to the city
+                TimeZone timeZone = TimeZoneApi.getTimeZone(geoCont, coordinates).await();
                 city.setTimeZone(timeZone);
 
                 om.writeValue(out, city);
-
-
 
             } catch (ApiException | InterruptedException e) {
                 e.printStackTrace();
@@ -139,11 +138,9 @@ public class GoogleAPIProcessor extends AbstractProcessor {
             } finally {
                 in.close();
             }
-
         });
 
         exitWithSuccess(output, session);
-
     }
 
     private void exitWithFailure(FlowFile flowFile, ProcessSession session) throws IOException {
