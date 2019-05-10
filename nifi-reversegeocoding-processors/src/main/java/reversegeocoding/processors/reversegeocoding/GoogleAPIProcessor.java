@@ -1,6 +1,5 @@
 package reversegeocoding.processors.reversegeocoding;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.maps.GeoApiContext;
 import com.google.maps.GeocodingApi;
 import com.google.maps.TimeZoneApi;
@@ -23,6 +22,8 @@ import org.apache.nifi.processor.exception.ProcessException;
 import org.apache.nifi.processor.util.StandardValidators;
 
 import java.io.IOException;
+import java.io.ObjectOutput;
+import java.io.ObjectOutputStream;
 import java.util.*;
 
 /**
@@ -48,6 +49,30 @@ public class GoogleAPIProcessor extends AbstractProcessor {
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .build();
 
+    /*
+     * CSV delimiter string
+     * */
+    public static final PropertyDescriptor CSV_DELIMETER = new PropertyDescriptor
+            .Builder().name("CSV_DELIMITER")
+            .displayName("csv delimiter")
+            .description("set csv delimiter string")
+            .required(true)
+            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+            .build();
+
+    /*
+     * CSV header check
+     * */
+    public static final PropertyDescriptor HAS_HEADER = new PropertyDescriptor
+            .Builder().name("HAS_HEADER")
+            .displayName("has header")
+            .description("Set true if csv file has header")
+            .required(true)
+            .allowableValues("true", "false")
+            .defaultValue("true")
+            .addValidator(StandardValidators.BOOLEAN_VALIDATOR)
+            .build();
+
     public static final Relationship SUCCESS_RELATIONSHIP = new Relationship.Builder()
             .name("success")
             .description("Success Relationship")
@@ -66,6 +91,8 @@ public class GoogleAPIProcessor extends AbstractProcessor {
     protected void init(final ProcessorInitializationContext context) {
         final List<PropertyDescriptor> descriptors = new ArrayList<PropertyDescriptor>();
         descriptors.add(GOOGLE_API_KEY_PROP);
+        descriptors.add(CSV_DELIMETER);
+        descriptors.add(HAS_HEADER);
         this.descriptors = Collections.unmodifiableList(descriptors);
 
         final Set<Relationship> relationships = new HashSet<Relationship>();
@@ -105,32 +132,59 @@ public class GoogleAPIProcessor extends AbstractProcessor {
                 .apiKey(context.getProperty(GOOGLE_API_KEY_PROP).getValue())
                 .build();
 
+        // get component properties
+        String csvDelimiter = context.getProperty(CSV_DELIMETER).getValue();
+        boolean hasHeader = context.getProperty(HAS_HEADER).asBoolean();
+
         FlowFile output = session.write(flowFile, (in, out) -> {
-            ObjectMapper om = new ObjectMapper();
+
+            CSVReader csvReader = new CSVReader(in, csvDelimiter, hasHeader);
+
+            // header check
+            if (!hasHeader) {
+                exitWithFailure(flowFile, session);
+            }
+
+            // get header fields
+            final List<String> headerFields = csvReader.getHeaderFields();
+
+            // header size check
+            if (headerFields.size() == 0) {
+                exitWithFailure(flowFile, session);
+            }
+
+            headerFields.add("country");
+            headerFields.add("timeZone");
+
+            List<String> lines = null;
+            HashMap<String, City> hashMap= new HashMap<>();
 
             try {
+                while ((lines = csvReader.getNextLineFields()) != null) {
+                    LatLng coordinates = new LatLng(Double.parseDouble(lines.get(1)), Double.parseDouble(lines.get(2)));
+                    GeocodingResult[] geocodingResults;
+                    geocodingResults = GeocodingApi.reverseGeocode(geoCont, coordinates).await();
+                    City city = new City(lines.get(0), lines.get(1), lines.get(2));
 
-                City city = om.readValue(in, City.class);
-                LatLng coordinates = new LatLng(Double.parseDouble(city.getLat()), Double.parseDouble(city.getLon()));
-
-                GeocodingResult[] geocodingResults;
-                geocodingResults = GeocodingApi.reverseGeocode(geoCont, coordinates).await();
-                String country;
-
-                for (int i = 0; i < geocodingResults[0].addressComponents.length; i++){
-                    if (geocodingResults[0].addressComponents[i].types[0] == AddressComponentType.COUNTRY){
-                        country = geocodingResults[0].addressComponents[i].longName;
-                        city.setCountry(country);
-                        break;
+                    for (int i = 0; i < geocodingResults[0].addressComponents.length; i++) {
+                        if (geocodingResults[0].addressComponents[i].types[0] == AddressComponentType.COUNTRY) {
+                            lines.add(geocodingResults[0].addressComponents[i].longName);
+                            city.setCountry(geocodingResults[0].addressComponents[i].longName);
+                            break;
+                        }
                     }
+                    // Set time zone to the city
+                    city.setTimeZone(TimeZoneApi.getTimeZone(geoCont, coordinates).await());
+
+                    hashMap.put(city.getName(), city);
+
                 }
 
-                // Set time zone to the city
-                TimeZone timeZone = TimeZoneApi.getTimeZone(geoCont, coordinates).await();
-                city.setTimeZone(timeZone);
+                csvReader.closeFile();
 
-                om.writeValue(out, city);
-
+                ObjectOutput objectOutput = new ObjectOutputStream(out);
+                objectOutput.writeObject(hashMap);
+                objectOutput.close();
             } catch (ApiException | InterruptedException e) {
                 e.printStackTrace();
                 out.close();

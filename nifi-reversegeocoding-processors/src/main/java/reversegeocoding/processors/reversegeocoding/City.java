@@ -4,15 +4,16 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
 
+import java.io.Serializable;
 import java.util.TimeZone;
 
 /**
  * city class modeling cities provided by csv files
  */
-public class City {
+public class City implements Serializable {
 
     @JsonProperty("City")
-    private String city;
+    private String name;
     @JsonProperty("Latitude")
     private String lat;
     @JsonProperty("Longitude")
@@ -20,15 +21,22 @@ public class City {
     private String country;
     private TimeZone timeZone;
 
+    public City(String name, String lat, String lon) {
+        this.name = name;
+        this.lat = lat;
+        this.lon = lon;
+    }
+
     public City() {
+
     }
 
-    public String getCity() {
-        return city;
+    public String getName() {
+        return name;
     }
 
-    public void setCity(String city) {
-        this.city = city;
+    public void setName(String name) {
+        this.name = name;
     }
 
     public String getLat() {
