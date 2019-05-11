@@ -53,7 +53,7 @@ public class CSVReader {
         if (line == null)
             return null;
 
-        if (this.hasHeader) {
+        if (this.hasHeader && this.header == null) {
             //save csv header
             this.header = line;
         }

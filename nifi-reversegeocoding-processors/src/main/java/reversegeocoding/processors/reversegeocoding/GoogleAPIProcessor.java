@@ -1,5 +1,6 @@
 package reversegeocoding.processors.reversegeocoding;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.maps.GeoApiContext;
 import com.google.maps.GeocodingApi;
 import com.google.maps.TimeZoneApi;
@@ -139,6 +140,7 @@ public class GoogleAPIProcessor extends AbstractProcessor {
         FlowFile output = session.write(flowFile, (in, out) -> {
 
             CSVReader csvReader = new CSVReader(in, csvDelimiter, hasHeader);
+            CSVWriter csvWriter = new CSVWriter(out, csvDelimiter);
 
             // header check
             if (!hasHeader) {
@@ -157,7 +159,8 @@ public class GoogleAPIProcessor extends AbstractProcessor {
             headerFields.add("timeZone");
 
             List<String> lines = null;
-            HashMap<String, City> hashMap= new HashMap<>();
+            //HashMap<String, City> hashMap= new HashMap<>();
+            csvWriter.writeLine(headerFields);
 
             try {
                 while ((lines = csvReader.getNextLineFields()) != null) {
@@ -176,21 +179,23 @@ public class GoogleAPIProcessor extends AbstractProcessor {
                     // Set time zone to the city
                     city.setTimeZone(TimeZoneApi.getTimeZone(geoCont, coordinates).await());
 
-                    hashMap.put(city.getName(), city);
+                    csvWriter.writeLine(Arrays.asList(city.getName(), city.getLat(), city.getLon(), city.getCountry(), city.getTimeZone().getDisplayName()));
+
+                    //hashMap.put(city.getName(), city);
 
                 }
 
                 csvReader.closeFile();
+                csvWriter.closeFile();
 
-                ObjectOutput objectOutput = new ObjectOutputStream(out);
+                /*ObjectOutput objectOutput = new ObjectOutputStream(out);
                 objectOutput.writeObject(hashMap);
-                objectOutput.close();
+                objectOutput.close();*/
             } catch (ApiException | InterruptedException e) {
                 e.printStackTrace();
-                out.close();
+                csvReader.closeFile();
+                csvWriter.closeFile();
                 exitWithFailure(flowFile, session);
-            } finally {
-                in.close();
             }
         });
 
