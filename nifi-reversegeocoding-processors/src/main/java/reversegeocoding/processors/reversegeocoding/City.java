@@ -76,8 +76,11 @@ public class City implements Serializable {
 
         if (timeOffset >= 0) {
             this.timeOffset += "+";
+            this.timeOffset += String.format("%02d", timeOffset);
+        } else {
+            this.timeOffset += String.format("%03d", timeOffset);
         }
 
-        this.timeOffset += Integer.toString(timeOffset);
+
     }
 }

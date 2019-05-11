@@ -156,7 +156,6 @@ public class GoogleAPIProcessor extends AbstractProcessor {
             headerFields.add("timeOffset");
 
             List<String> lines = null;
-            //HashMap<String, City> hashMap= new HashMap<>();
             csvWriter.writeLine(headerFields);
 
             try {
@@ -179,16 +178,10 @@ public class GoogleAPIProcessor extends AbstractProcessor {
 
                     csvWriter.writeLine(Arrays.asList(city.getName(), city.getLat(), city.getLon(), city.getCountry(), city.getTimeOffset()));
 
-                    //hashMap.put(city.getName(), city);
-
                 }
 
                 csvReader.closeFile();
                 csvWriter.closeFile();
-
-                /*ObjectOutput objectOutput = new ObjectOutputStream(out);
-                objectOutput.writeObject(hashMap);
-                objectOutput.close();*/
             } catch (ApiException | InterruptedException e) {
                 e.printStackTrace();
                 csvReader.closeFile();
