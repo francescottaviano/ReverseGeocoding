@@ -70,4 +70,14 @@ public class City implements Serializable {
     public void setTimeOffset(String timeOffset) {
         this.timeOffset = timeOffset;
     }
+
+    public void setTimeOffset(int timeOffset) {
+        this.timeOffset = "";
+
+        if (timeOffset >= 0) {
+            this.timeOffset += "+";
+        }
+
+        this.timeOffset += Integer.toString(timeOffset);
+    }
 }

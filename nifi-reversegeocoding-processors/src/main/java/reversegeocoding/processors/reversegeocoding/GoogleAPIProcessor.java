@@ -174,8 +174,8 @@ public class GoogleAPIProcessor extends AbstractProcessor {
                         }
                     }
                     // Set time zone to the city
-                    int offset = TimeZoneApi.getTimeZone(geoCont, coordinates).await().getRawOffset();
-                    city.setTimeOffset(Integer.toString(offset/3600));
+                    int offset = TimeZoneApi.getTimeZone(geoCont, coordinates).await().getRawOffset()/3600000;
+                    city.setTimeOffset(offset);
 
                     csvWriter.writeLine(Arrays.asList(city.getName(), city.getLat(), city.getLon(), city.getCountry(), city.getTimeOffset()));
 
