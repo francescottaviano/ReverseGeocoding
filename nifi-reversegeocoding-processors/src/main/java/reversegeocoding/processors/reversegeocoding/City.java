@@ -19,7 +19,7 @@ public class City implements Serializable {
     @JsonProperty("Longitude")
     private String lon;
     private String country;
-    private TimeZone timeZone;
+    private String timeOffset;
 
     public City(String name, String lat, String lon) {
         this.name = name;
@@ -63,11 +63,11 @@ public class City implements Serializable {
         this.country = country;
     }
 
-    public TimeZone getTimeZone() {
-        return timeZone;
+    public String getTimeOffset() {
+        return timeOffset;
     }
 
-    public void setTimeZone(TimeZone timeZone) {
-        this.timeZone = timeZone;
+    public void setTimeOffset(String timeOffset) {
+        this.timeOffset = timeOffset;
     }
 }

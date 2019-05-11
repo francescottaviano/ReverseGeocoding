@@ -1,6 +1,5 @@
 package reversegeocoding.processors.reversegeocoding;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.maps.GeoApiContext;
 import com.google.maps.GeocodingApi;
 import com.google.maps.TimeZoneApi;
@@ -23,8 +22,6 @@ import org.apache.nifi.processor.exception.ProcessException;
 import org.apache.nifi.processor.util.StandardValidators;
 
 import java.io.IOException;
-import java.io.ObjectOutput;
-import java.io.ObjectOutputStream;
 import java.util.*;
 
 /**
@@ -133,7 +130,7 @@ public class GoogleAPIProcessor extends AbstractProcessor {
                 .apiKey(context.getProperty(GOOGLE_API_KEY_PROP).getValue())
                 .build();
 
-        // get component properties
+        // Get component properties
         String csvDelimiter = context.getProperty(CSV_DELIMETER).getValue();
         boolean hasHeader = context.getProperty(HAS_HEADER).asBoolean();
 
@@ -142,21 +139,21 @@ public class GoogleAPIProcessor extends AbstractProcessor {
             CSVReader csvReader = new CSVReader(in, csvDelimiter, hasHeader);
             CSVWriter csvWriter = new CSVWriter(out, csvDelimiter);
 
-            // header check
+            // Header check
             if (!hasHeader) {
                 exitWithFailure(flowFile, session);
             }
 
-            // get header fields
+            // Get header fields
             final List<String> headerFields = csvReader.getHeaderFields();
 
-            // header size check
+            // Header size check
             if (headerFields.size() == 0) {
                 exitWithFailure(flowFile, session);
             }
 
             headerFields.add("country");
-            headerFields.add("timeZone");
+            headerFields.add("timeOffset");
 
             List<String> lines = null;
             //HashMap<String, City> hashMap= new HashMap<>();
@@ -177,9 +174,10 @@ public class GoogleAPIProcessor extends AbstractProcessor {
                         }
                     }
                     // Set time zone to the city
-                    city.setTimeZone(TimeZoneApi.getTimeZone(geoCont, coordinates).await());
+                    int offset = TimeZoneApi.getTimeZone(geoCont, coordinates).await().getRawOffset();
+                    city.setTimeOffset(Integer.toString(offset/3600));
 
-                    csvWriter.writeLine(Arrays.asList(city.getName(), city.getLat(), city.getLon(), city.getCountry(), city.getTimeZone().getDisplayName()));
+                    csvWriter.writeLine(Arrays.asList(city.getName(), city.getLat(), city.getLon(), city.getCountry(), city.getTimeOffset()));
 
                     //hashMap.put(city.getName(), city);
 
