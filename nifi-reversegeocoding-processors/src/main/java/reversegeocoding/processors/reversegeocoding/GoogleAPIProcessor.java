@@ -173,12 +173,7 @@ public class GoogleAPIProcessor extends AbstractProcessor {
                         }
                     }
                     // Set time zone to the city
-                    int offset;
-                    if(TimeZoneApi.getTimeZone(geoCont, coordinates).await().inDaylightTime(new Date())) {
-                        offset = (TimeZoneApi.getTimeZone(geoCont, coordinates).await().getRawOffset() / 3600000)+1;
-                    } else {
-                        offset = (TimeZoneApi.getTimeZone(geoCont, coordinates).await().getRawOffset() / 3600000);
-                    }
+                    int offset = TimeZoneApi.getTimeZone(geoCont, coordinates).await().getRawOffset()/3600000;
                     city.setTimeOffset(offset);
 
                     csvWriter.writeLine(Arrays.asList(city.getName(), city.getLat(), city.getLon(), city.getCountry(), city.getTimeOffset()));
