@@ -1,11 +1,8 @@
 package reversegeocoding.processors.reversegeocoding;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonValue;
 
 import java.io.Serializable;
-import java.util.TimeZone;
 
 /**
  * city class modeling cities provided by csv files
