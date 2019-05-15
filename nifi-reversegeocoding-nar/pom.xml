@@ -32,6 +32,12 @@
 
     <dependencies>
         <dependency>
+            <groupId>org.apache.nifi</groupId>
+            <artifactId>nifi-standard-services-api-nar</artifactId>
+            <version>1.9.0</version>
+            <type>nar</type>
+        </dependency>
+        <dependency>
             <groupId>reversegeocoding</groupId>
             <artifactId>nifi-reversegeocoding-processors</artifactId>
             <version>1.0-SNAPSHOT</version>

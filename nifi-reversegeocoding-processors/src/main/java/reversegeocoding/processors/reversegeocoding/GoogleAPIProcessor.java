@@ -1,6 +1,5 @@
 package reversegeocoding.processors.reversegeocoding;
 
-import com.google.maps.GeoApiContext;
 import com.google.maps.GeocodingApi;
 import com.google.maps.TimeZoneApi;
 import com.google.maps.errors.ApiException;
@@ -16,10 +15,14 @@ import org.apache.nifi.annotation.documentation.SeeAlso;
 import org.apache.nifi.annotation.documentation.Tags;
 import org.apache.nifi.annotation.lifecycle.OnScheduled;
 import org.apache.nifi.components.PropertyDescriptor;
+import org.apache.nifi.distributed.cache.client.DistributedMapCacheClient;
 import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.processor.*;
 import org.apache.nifi.processor.exception.ProcessException;
 import org.apache.nifi.processor.util.StandardValidators;
+import reversegeocoding.processors.reversegeocoding.deserializers.CityDeserializer;
+import reversegeocoding.processors.reversegeocoding.serializers.CitySerializer;
+import reversegeocoding.processors.reversegeocoding.serializers.StringSerializer;
 
 import java.io.IOException;
 import java.util.*;
@@ -71,6 +74,14 @@ public class GoogleAPIProcessor extends AbstractProcessor {
             .addValidator(StandardValidators.BOOLEAN_VALIDATOR)
             .build();
 
+    // Identifies the distributed map cache client
+    public static final PropertyDescriptor DISTRIBUTED_CACHE_SERVICE = new PropertyDescriptor.Builder()
+            .name("Distributed Cache Service")
+            .description("The Controller Service that is used to cache flow files")
+            .required(true)
+            .identifiesControllerService(DistributedMapCacheClient.class)
+            .build();
+
     public static final Relationship SUCCESS_RELATIONSHIP = new Relationship.Builder()
             .name("success")
             .description("Success Relationship")
@@ -85,12 +96,23 @@ public class GoogleAPIProcessor extends AbstractProcessor {
 
     private Set<Relationship> relationships;
 
+    /**
+     * processor specific attributes
+     * */
+    // Get component properties
+    private String apiKey;
+    private String csvDelimiter;
+    private boolean hasHeader;
+    private CacheProvider cacheProvider;
+    private GeoCodingProvider geoCodingProvider;
+
     @Override
     protected void init(final ProcessorInitializationContext context) {
         final List<PropertyDescriptor> descriptors = new ArrayList<PropertyDescriptor>();
         descriptors.add(GOOGLE_API_KEY_PROP);
         descriptors.add(CSV_DELIMETER);
         descriptors.add(HAS_HEADER);
+        descriptors.add(DISTRIBUTED_CACHE_SERVICE);
         this.descriptors = Collections.unmodifiableList(descriptors);
 
         final Set<Relationship> relationships = new HashSet<Relationship>();
@@ -111,6 +133,28 @@ public class GoogleAPIProcessor extends AbstractProcessor {
 
     @OnScheduled
     public void onScheduled(final ProcessContext context) {
+        /*
+         * Reverse Geocoding Google service to provide
+         * country and timezone information from city coordinates.
+         */
+        // Build GeoApiContext with API Key provided by Property value
+        apiKey = context.getProperty(GOOGLE_API_KEY_PROP).getValue();
+        geoCodingProvider = new GeoCodingProvider.GeoCodingProviderBuilder()
+                .setApiKey(apiKey)
+                .build();
+
+        // Get component properties
+        csvDelimiter = context.getProperty(CSV_DELIMETER).getValue();
+        hasHeader = context.getProperty(HAS_HEADER).asBoolean();
+
+        // build cache provider
+        DistributedMapCacheClient cache = context.getProperty(DISTRIBUTED_CACHE_SERVICE)
+                .asControllerService(DistributedMapCacheClient.class);
+
+        this.cacheProvider = new CacheProvider.CacheProviderBuilder()
+                .setCache(cache)
+                .build();
+
     }
 
     @Override
@@ -119,20 +163,6 @@ public class GoogleAPIProcessor extends AbstractProcessor {
         if ( flowFile == null ) {
             return;
         }
-
-        /*
-         * Reverse Geocoding Google service to provide
-         * country and timezone information from city coordinates.
-         */
-
-        // Build GeoApiContext with API Key provided by Property value
-        GeoApiContext geoCont = new GeoApiContext.Builder()
-                .apiKey(context.getProperty(GOOGLE_API_KEY_PROP).getValue())
-                .build();
-
-        // Get component properties
-        String csvDelimiter = context.getProperty(CSV_DELIMETER).getValue();
-        boolean hasHeader = context.getProperty(HAS_HEADER).asBoolean();
 
         FlowFile output = session.write(flowFile, (in, out) -> {
 
@@ -155,28 +185,25 @@ public class GoogleAPIProcessor extends AbstractProcessor {
             headerFields.add("country");
             headerFields.add("timeOffset");
 
-            List<String> lines = null;
+            //keep track of elements in csv
+            HashMap<String, Integer> headerMap = parseCSVHeader(headerFields);
+
+            List<String> line = null;
             csvWriter.writeLine(headerFields);
 
+            //create serializers
+            StringSerializer stringSerializer = new StringSerializer();
+            CitySerializer citySerializer = new CitySerializer();
+
+            //create deserializers
+            CityDeserializer cityDeserializer = new CityDeserializer();
+
             try {
-                while ((lines = csvReader.getNextLineFields()) != null) {
-                    LatLng coordinates = new LatLng(Double.parseDouble(lines.get(1)), Double.parseDouble(lines.get(2)));
-                    GeocodingResult[] geocodingResults;
-                    geocodingResults = GeocodingApi.reverseGeocode(geoCont, coordinates).await();
-                    City city = new City(lines.get(0), lines.get(1), lines.get(2));
+                while ((line = csvReader.getNextLineFields()) != null) {
 
-                    for (int i = 0; i < geocodingResults[0].addressComponents.length; i++) {
-                        if (geocodingResults[0].addressComponents[i].types[0] == AddressComponentType.COUNTRY) {
-                            lines.add(geocodingResults[0].addressComponents[i].longName);
-                            city.setCountry(geocodingResults[0].addressComponents[i].longName);
-                            break;
-                        }
-                    }
-                    // Set time zone to the city
-                    int offset = TimeZoneApi.getTimeZone(geoCont, coordinates).await().getRawOffset()/3600000;
-                    city.setTimeOffset(offset);
-
-                    csvWriter.writeLine(Arrays.asList(city.getName(), city.getLat(), city.getLon(), city.getCountry(), city.getTimeOffset()));
+                    City city = readCity(line, headerMap);
+                    city = reverseGeoCoding(city, cacheProvider, stringSerializer, citySerializer, cityDeserializer);
+                    csvWriter.writeLine(Arrays.asList(city.getName(), city.getLat().toString(), city.getLon().toString(), city.getCountry(), city.getTimeOffset()));
 
                 }
 
@@ -191,6 +218,102 @@ public class GoogleAPIProcessor extends AbstractProcessor {
         });
 
         exitWithSuccess(output, session);
+    }
+
+    /**
+     * map csv header
+     * @param headerFields
+     * @return
+     */
+    private HashMap<String, Integer> parseCSVHeader(List<String> headerFields) {
+        HashMap<String, Integer> map = new HashMap<>();
+
+        for (int i = 0; i < headerFields.size(); i++) {
+            map.put(headerFields.get(i), i);
+        }
+
+        return map;
+    }
+
+    /**
+     * read city from file
+     * @param line
+     * @return
+     */
+    private City readCity(List<String> line, HashMap<String, Integer> headerMap) {
+        return new City(
+                line.get(headerMap.get("City")),
+                Double.parseDouble(line.get(headerMap.get("Latitude"))),
+                Double.parseDouble(line.get(headerMap.get("Longitude")))
+        );
+    }
+
+    /**
+     * reverse geocoding main routine
+     * @param city
+     * @return
+     */
+    private City reverseGeoCoding(City city, CacheProvider cacheProvider,
+                                  StringSerializer stringSerializer, CitySerializer citySerializer,
+                                  CityDeserializer cityDeserializer) throws IOException, ApiException, InterruptedException {
+        City cachedCity = readFromCache(city.getName(), cacheProvider, stringSerializer, cityDeserializer);
+        if (cachedCity != null) {
+            return cachedCity;
+        } else {
+            /*City c = askProvider(city);
+            putInCache(c, cacheProvider, stringSerializer, citySerializer);
+            return c;*/
+            City c = new City("root", 0.0, 0.0);
+            c.setCountry("root");
+            c.parseTimeOffset(-2.43);
+            return c;
+        }
+    }
+
+    /**
+     * read from redis cache
+     * @param key
+     * @param cacheProvider
+     * @param stringSerializer
+     * @param cityDeserializer
+     * @return
+     */
+    private City readFromCache(String key, CacheProvider cacheProvider, StringSerializer stringSerializer,
+                               CityDeserializer cityDeserializer) throws IOException {
+        return cacheProvider.getCache().get(key, stringSerializer, cityDeserializer);
+    }
+
+    /**
+     * put in cache
+     * @param city
+     * @param cacheProvider
+     * @param stringSerializer
+     * @param citySerializer
+     */
+    private void putInCache(City city, CacheProvider cacheProvider, StringSerializer stringSerializer,
+                            CitySerializer citySerializer) throws IOException {
+        cacheProvider.getCache().put(city.getName(), city, stringSerializer, citySerializer);
+    }
+
+    /**
+     * ask reverse geocoding provider
+     * @param city
+     * @return
+     */
+    private City askProvider(City city) throws InterruptedException, ApiException, IOException {
+        LatLng coordinates = new LatLng(city.getLat(), city.getLon());
+        GeocodingResult[] geoCodingResults = GeocodingApi.reverseGeocode(geoCodingProvider.getGeoApiContext(), coordinates).await();
+
+        for (int i = 0; i < geoCodingResults[0].addressComponents.length; i++) {
+            if (geoCodingResults[0].addressComponents[i].types[0] == AddressComponentType.COUNTRY) {
+                city.setCountry(geoCodingResults[0].addressComponents[i].longName);
+                break;
+            }
+        }
+        // Set time zone to the city
+        double offset = TimeZoneApi.getTimeZone(geoCodingProvider.getGeoApiContext(), coordinates).await().getRawOffset()/3600000.0;
+        city.parseTimeOffset(offset);
+        return city;
     }
 
     private void exitWithFailure(FlowFile flowFile, ProcessSession session) throws IOException {

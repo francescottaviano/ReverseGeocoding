@@ -3,22 +3,21 @@ package reversegeocoding.processors.reversegeocoding;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.io.Serializable;
+import java.text.DecimalFormat;
+import java.text.NumberFormat;
 
 /**
  * city class modeling cities provided by csv files
  */
 public class City implements Serializable {
 
-    @JsonProperty("City")
     private String name;
-    @JsonProperty("Latitude")
-    private String lat;
-    @JsonProperty("Longitude")
-    private String lon;
+    private Double lat;
+    private Double lon;
     private String country;
     private String timeOffset;
 
-    public City(String name, String lat, String lon) {
+    public City(String name, Double lat, Double lon) {
         this.name = name;
         this.lat = lat;
         this.lon = lon;
@@ -36,19 +35,19 @@ public class City implements Serializable {
         this.name = name;
     }
 
-    public String getLat() {
+    public Double getLat() {
         return lat;
     }
 
-    public void setLat(String lat) {
+    public void setLat(Double lat) {
         this.lat = lat;
     }
 
-    public String getLon() {
+    public Double getLon() {
         return lon;
     }
 
-    public void setLon(String lon) {
+    public void setLon(Double lon) {
         this.lon = lon;
     }
 
@@ -68,16 +67,16 @@ public class City implements Serializable {
         this.timeOffset = timeOffset;
     }
 
-    public void setTimeOffset(int timeOffset) {
+    public void parseTimeOffset(double timeOffset) {
+        NumberFormat formatter = new DecimalFormat("#00.00");
         this.timeOffset = "";
+        String offset = "";
 
         if (timeOffset >= 0) {
             this.timeOffset += "+";
-            this.timeOffset += String.format("%02d", timeOffset);
-        } else {
-            this.timeOffset += String.format("%03d", timeOffset);
         }
-
+        offset += formatter.format(timeOffset);
+        this.timeOffset += String.format("%s", offset.replace(".",""));
 
     }
 }

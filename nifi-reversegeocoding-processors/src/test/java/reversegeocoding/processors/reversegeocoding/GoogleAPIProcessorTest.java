@@ -16,10 +16,20 @@
  */
 package reversegeocoding.processors.reversegeocoding;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.nifi.util.TestRunner;
 import org.apache.nifi.util.TestRunners;
 import org.junit.Before;
 import org.junit.Test;
+import reversegeocoding.processors.reversegeocoding.deserializers.CityDeserializer;
+import reversegeocoding.processors.reversegeocoding.serializers.CitySerializer;
+
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.text.DecimalFormat;
+import java.text.NumberFormat;
+import java.util.Arrays;
+import java.util.List;
 
 
 public class GoogleAPIProcessorTest {
@@ -32,7 +42,7 @@ public class GoogleAPIProcessorTest {
     }
 
     @Test
-    public void testProcessor() {
+    public void testProcessor() throws IOException {
 
     }
 
