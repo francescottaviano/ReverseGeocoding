@@ -67,16 +67,4 @@ public class City implements Serializable {
         this.timeOffset = timeOffset;
     }
 
-    public void parseTimeOffset(double timeOffset) {
-        NumberFormat formatter = new DecimalFormat("#00.00");
-        this.timeOffset = "";
-        String offset = "";
-
-        if (timeOffset >= 0) {
-            this.timeOffset += "+";
-        }
-        offset += formatter.format(timeOffset);
-        this.timeOffset += String.format("%s", offset.replace(".",""));
-
-    }
 }

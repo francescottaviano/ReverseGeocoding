@@ -21,6 +21,9 @@ import org.apache.nifi.processor.*;
 import org.apache.nifi.processor.exception.ProcessException;
 import org.apache.nifi.processor.util.StandardValidators;
 import reversegeocoding.processors.reversegeocoding.deserializers.CityDeserializer;
+import reversegeocoding.processors.reversegeocoding.providers.GeoCodingProvider;
+import reversegeocoding.processors.reversegeocoding.providers.GeoCodingProviderFactory;
+import reversegeocoding.processors.reversegeocoding.providers.GoogleAPIProvider;
 import reversegeocoding.processors.reversegeocoding.serializers.CitySerializer;
 import reversegeocoding.processors.reversegeocoding.serializers.StringSerializer;
 
@@ -37,7 +40,7 @@ import java.util.*;
 @SeeAlso({})
 @ReadsAttributes({@ReadsAttribute(attribute="", description="")})
 @WritesAttributes({@WritesAttribute(attribute="", description="")})
-public class GoogleAPIProcessor extends AbstractProcessor {
+public class ReverseGeocodingProcessor extends AbstractProcessor {
 
     /*
     * Google API Key property is required to use Google services
@@ -46,6 +49,22 @@ public class GoogleAPIProcessor extends AbstractProcessor {
             .Builder().name("GOOGLE_API_KEY_PROP")
             .displayName("Google API key")
             .description("Google API key to access Google Places services")
+            .allowableValues("GOOGLE_API_PROVIDER", "GEO_NAMES_PROVIDER")
+            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+            .build();
+
+    public static final PropertyDescriptor GEO_NAMES_USERNAME_PROP = new PropertyDescriptor
+            .Builder().name("GEO_NAMES_USERNAME_PROP")
+            .displayName("GeoNames username")
+            .description("GeoNames username")
+            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+            .build();
+
+
+    public static final PropertyDescriptor GEO_CODING_PROVIDER_PROP = new PropertyDescriptor
+            .Builder().name("GEO_CODING_PROVIDER_PROP")
+            .displayName("GeoCoding Provider")
+            .description("GeoCoding Provider")
             .required(true)
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .build();
@@ -101,6 +120,7 @@ public class GoogleAPIProcessor extends AbstractProcessor {
      * */
     // Get component properties
     private String apiKey;
+    private String geoNamesUsername;
     private String csvDelimiter;
     private boolean hasHeader;
     private CacheProvider cacheProvider;
@@ -109,7 +129,7 @@ public class GoogleAPIProcessor extends AbstractProcessor {
     @Override
     protected void init(final ProcessorInitializationContext context) {
         final List<PropertyDescriptor> descriptors = new ArrayList<PropertyDescriptor>();
-        descriptors.add(GOOGLE_API_KEY_PROP);
+        descriptors.add(GEO_CODING_PROVIDER_PROP);
         descriptors.add(CSV_DELIMETER);
         descriptors.add(HAS_HEADER);
         descriptors.add(DISTRIBUTED_CACHE_SERVICE);
@@ -137,11 +157,7 @@ public class GoogleAPIProcessor extends AbstractProcessor {
          * Reverse Geocoding Google service to provide
          * country and timezone information from city coordinates.
          */
-        // Build GeoApiContext with API Key provided by Property value
-        apiKey = context.getProperty(GOOGLE_API_KEY_PROP).getValue();
-        geoCodingProvider = new GeoCodingProvider.GeoCodingProviderBuilder()
-                .setApiKey(apiKey)
-                .build();
+        buildGeocodingProvider(context);
 
         // Get component properties
         csvDelimiter = context.getProperty(CSV_DELIMETER).getValue();
@@ -155,6 +171,29 @@ public class GoogleAPIProcessor extends AbstractProcessor {
                 .setCache(cache)
                 .build();
 
+    }
+
+    private void buildGeocodingProvider(ProcessContext context) {
+        GeoCodingProviderFactory.ProviderType providerType = GeoCodingProviderFactory.ProviderType
+                .valueOf(context.getProperty(GEO_CODING_PROVIDER_PROP).getValue());
+
+
+        switch (providerType) {
+            case GOOGLE_API_PROVIDER:
+                apiKey = context.getProperty(GOOGLE_API_KEY_PROP).getValue();
+                if (apiKey == null) {
+                    return;
+                }
+                geoCodingProvider = GeoCodingProviderFactory.createProvider(providerType, apiKey);
+                break;
+            case GEO_NAMES_PROVIDER:
+                geoNamesUsername = context.getProperty(GEO_NAMES_USERNAME_PROP).getValue();
+                if (geoNamesUsername == null) {
+                    return;
+                }
+                geoCodingProvider = GeoCodingProviderFactory.createProvider(providerType, geoNamesUsername);
+                break;
+        }
     }
 
     @Override
@@ -202,7 +241,7 @@ public class GoogleAPIProcessor extends AbstractProcessor {
                 while ((line = csvReader.getNextLineFields()) != null) {
 
                     City city = readCity(line, headerMap);
-                    city = reverseGeoCoding(city, cacheProvider, stringSerializer, citySerializer, cityDeserializer);
+                    city = reverseGeoCoding(city, cacheProvider, geoCodingProvider, stringSerializer, citySerializer, cityDeserializer);
                     csvWriter.writeLine(Arrays.asList(city.getName(), city.getLat().toString(), city.getLon().toString(), city.getCountry(), city.getTimeOffset()));
 
                 }
@@ -253,19 +292,15 @@ public class GoogleAPIProcessor extends AbstractProcessor {
      * @param city
      * @return
      */
-    private City reverseGeoCoding(City city, CacheProvider cacheProvider,
+    private City reverseGeoCoding(City city, CacheProvider cacheProvider, GeoCodingProvider geoCodingProvider,
                                   StringSerializer stringSerializer, CitySerializer citySerializer,
                                   CityDeserializer cityDeserializer) throws IOException, ApiException, InterruptedException {
         City cachedCity = readFromCache(city.getName(), cacheProvider, stringSerializer, cityDeserializer);
         if (cachedCity != null) {
             return cachedCity;
         } else {
-            /*City c = askProvider(city);
+            City c = askProvider(city, geoCodingProvider);
             putInCache(c, cacheProvider, stringSerializer, citySerializer);
-            return c;*/
-            City c = new City("root", 0.0, 0.0);
-            c.setCountry("root");
-            c.parseTimeOffset(-2.43);
             return c;
         }
     }
@@ -298,22 +333,11 @@ public class GoogleAPIProcessor extends AbstractProcessor {
     /**
      * ask reverse geocoding provider
      * @param city
+     * @param geoCodingProvider
      * @return
      */
-    private City askProvider(City city) throws InterruptedException, ApiException, IOException {
-        LatLng coordinates = new LatLng(city.getLat(), city.getLon());
-        GeocodingResult[] geoCodingResults = GeocodingApi.reverseGeocode(geoCodingProvider.getGeoApiContext(), coordinates).await();
-
-        for (int i = 0; i < geoCodingResults[0].addressComponents.length; i++) {
-            if (geoCodingResults[0].addressComponents[i].types[0] == AddressComponentType.COUNTRY) {
-                city.setCountry(geoCodingResults[0].addressComponents[i].longName);
-                break;
-            }
-        }
-        // Set time zone to the city
-        double offset = TimeZoneApi.getTimeZone(geoCodingProvider.getGeoApiContext(), coordinates).await().getRawOffset()/3600000.0;
-        city.parseTimeOffset(offset);
-        return city;
+    private City askProvider(City city, GeoCodingProvider geoCodingProvider) throws InterruptedException, ApiException, IOException {
+        return geoCodingProvider.resolve(city);
     }
 
     private void exitWithFailure(FlowFile flowFile, ProcessSession session) throws IOException {
