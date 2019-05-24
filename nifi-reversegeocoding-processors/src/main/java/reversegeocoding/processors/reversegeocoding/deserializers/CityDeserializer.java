@@ -7,6 +7,10 @@ import reversegeocoding.processors.reversegeocoding.City;
 
 import java.io.IOException;
 
+/**
+ * City Deserializer class
+ * */
+
 public class CityDeserializer implements Deserializer<City> {
     private ObjectMapper objectMapper;
 

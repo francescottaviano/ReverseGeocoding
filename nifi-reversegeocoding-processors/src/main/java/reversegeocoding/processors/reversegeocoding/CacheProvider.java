@@ -2,6 +2,10 @@ package reversegeocoding.processors.reversegeocoding;
 
 import org.apache.nifi.distributed.cache.client.DistributedMapCacheClient;
 
+/**
+ * Cache Provider class
+ * */
+
 class CacheProvider {
     private DistributedMapCacheClient cache;
 

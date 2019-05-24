@@ -6,6 +6,10 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.util.List;
 
+/**
+ * CSV Writer class which provides useful methods to write on csv file
+ * */
+
 public class CSVWriter {
     private BufferedWriter bw;
 

@@ -8,6 +8,10 @@ import reversegeocoding.processors.reversegeocoding.City;
 import java.io.IOException;
 import java.io.OutputStream;
 
+/**
+ * City Serializer class
+ * */
+
 public class CitySerializer implements Serializer<City> {
     private ObjectMapper objectMapper;
 

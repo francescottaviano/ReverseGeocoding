@@ -1,5 +1,9 @@
 package reversegeocoding.processors.reversegeocoding.utils;
 
+/**
+ * GeoNames class modeling GeoNames results
+ * */
+
 public class GeoNamesEntity {
     private String sunrise;
     private double lng;

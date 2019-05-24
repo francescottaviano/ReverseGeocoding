@@ -3,8 +3,9 @@ package reversegeocoding.processors.reversegeocoding;
 import java.io.Serializable;
 
 /**
- * city class modeling cities provided by csv files
+ * City class modeling cities provided by csv files
  */
+
 public class City implements Serializable {
 
     private String name;
