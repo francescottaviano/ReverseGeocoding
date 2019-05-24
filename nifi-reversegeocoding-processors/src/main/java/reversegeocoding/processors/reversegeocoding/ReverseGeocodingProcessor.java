@@ -31,32 +31,35 @@ import java.io.IOException;
 import java.util.*;
 
 /**
- * Google Places API NiFi Processor main class
- * It requires API Key as Property
+ * Reverse Geocoding NiFi Processor main class
+ * It requires GeoNames username or Google API key as Property
  */
 
-@Tags({"jasmine", "reverse", "geocode", "country", "google", "places", "timezone"})
-@CapabilityDescription("Reverse Geocoding")
+@Tags({"jasmine", "reverse", "geocode", "country", "geonames", "timezone"})
+@CapabilityDescription("Reverse Geocoding Processor")
 @SeeAlso({})
 @ReadsAttributes({@ReadsAttribute(attribute="", description="")})
 @WritesAttributes({@WritesAttribute(attribute="", description="")})
 public class ReverseGeocodingProcessor extends AbstractProcessor {
 
-    /*
+    /**
     * Google API Key property is required to use Google services
-    * */
+    */
     public static final PropertyDescriptor GOOGLE_API_KEY_PROP = new PropertyDescriptor
             .Builder().name("GOOGLE_API_KEY_PROP")
             .displayName("Google API key")
-            .description("Google API key to access Google Places services")
+            .description("Google API key required to access Google Places services")
             .allowableValues("GOOGLE_API_PROVIDER", "GEO_NAMES_PROVIDER")
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .build();
 
+    /**
+     * GoeoNames username property is required to use GeoNames services
+     */
     public static final PropertyDescriptor GEO_NAMES_USERNAME_PROP = new PropertyDescriptor
             .Builder().name("GEO_NAMES_USERNAME_PROP")
             .displayName("GeoNames username")
-            .description("GeoNames username")
+            .description("GeoNames username required to access GeoNames services")
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .build();
 
@@ -69,24 +72,24 @@ public class ReverseGeocodingProcessor extends AbstractProcessor {
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .build();
 
-    /*
-     * CSV delimiter string
-     * */
+    /**
+     * CSV delimiter string property
+     */
     public static final PropertyDescriptor CSV_DELIMETER = new PropertyDescriptor
             .Builder().name("CSV_DELIMITER")
-            .displayName("csv delimiter")
-            .description("set csv delimiter string")
+            .displayName("CSV delimiter")
+            .description("Set csv delimiter string")
             .required(true)
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .build();
 
-    /*
+    /**
      * CSV header check
-     * */
+     */
     public static final PropertyDescriptor HAS_HEADER = new PropertyDescriptor
             .Builder().name("HAS_HEADER")
             .displayName("has header")
-            .description("Set true if csv file has header")
+            .description("Set true if CSV file has header")
             .required(true)
             .allowableValues("true", "false")
             .defaultValue("true")
@@ -101,11 +104,17 @@ public class ReverseGeocodingProcessor extends AbstractProcessor {
             .identifiesControllerService(DistributedMapCacheClient.class)
             .build();
 
+    /**
+     * Success Relationship
+     */
     public static final Relationship SUCCESS_RELATIONSHIP = new Relationship.Builder()
             .name("success")
             .description("Success Relationship")
             .build();
 
+    /**
+     * Failure Relationship
+     */
     public static final Relationship FAILURE_RELATIONSHIP = new Relationship.Builder()
             .name("failure")
             .description("Failure Relationship")
@@ -115,10 +124,9 @@ public class ReverseGeocodingProcessor extends AbstractProcessor {
 
     private Set<Relationship> relationships;
 
-    /**
-     * processor specific attributes
-     * */
-    // Get component properties
+    /*
+     * Processor specific attributes
+     */
     private String apiKey;
     private String geoNamesUsername;
     private String csvDelimiter;
@@ -129,6 +137,9 @@ public class ReverseGeocodingProcessor extends AbstractProcessor {
     @Override
     protected void init(final ProcessorInitializationContext context) {
         final List<PropertyDescriptor> descriptors = new ArrayList<PropertyDescriptor>();
+        /*
+        * Adding properties to descriptors list
+        * */
         descriptors.add(GEO_CODING_PROVIDER_PROP);
         descriptors.add(CSV_DELIMETER);
         descriptors.add(HAS_HEADER);
@@ -136,6 +147,9 @@ public class ReverseGeocodingProcessor extends AbstractProcessor {
         this.descriptors = Collections.unmodifiableList(descriptors);
 
         final Set<Relationship> relationships = new HashSet<Relationship>();
+        /*
+         * Adding relationships to relationships set
+         * */
         relationships.add(SUCCESS_RELATIONSHIP);
         relationships.add(FAILURE_RELATIONSHIP);
         this.relationships = Collections.unmodifiableSet(relationships);
@@ -154,7 +168,7 @@ public class ReverseGeocodingProcessor extends AbstractProcessor {
     @OnScheduled
     public void onScheduled(final ProcessContext context) {
         /*
-         * Reverse Geocoding Google service to provide
+         * Reverse Geocoding service to provide
          * country and timezone information from city coordinates.
          */
         buildGeocodingProvider(context);
@@ -163,7 +177,7 @@ public class ReverseGeocodingProcessor extends AbstractProcessor {
         csvDelimiter = context.getProperty(CSV_DELIMETER).getValue();
         hasHeader = context.getProperty(HAS_HEADER).asBoolean();
 
-        // build cache provider
+        // Build cache provider
         DistributedMapCacheClient cache = context.getProperty(DISTRIBUTED_CACHE_SERVICE)
                 .asControllerService(DistributedMapCacheClient.class);
 

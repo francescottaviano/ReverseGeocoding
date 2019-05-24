@@ -1,5 +1,9 @@
 package reversegeocoding.processors.reversegeocoding.providers;
 
+/**
+ * Geocoding Provider factory class
+ * */
+
 public class GeoCodingProviderFactory {
 
     public enum ProviderType {

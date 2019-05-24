@@ -1,14 +1,11 @@
 package reversegeocoding.processors.reversegeocoding;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-
 import java.io.Serializable;
-import java.text.DecimalFormat;
-import java.text.NumberFormat;
 
 /**
- * city class modeling cities provided by csv files
+ * City class modeling cities provided by csv files
  */
+
 public class City implements Serializable {
 
     private String name;
