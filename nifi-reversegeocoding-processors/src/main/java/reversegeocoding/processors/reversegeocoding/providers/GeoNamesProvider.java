@@ -1,20 +1,14 @@
 package reversegeocoding.processors.reversegeocoding.providers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.fluent.Request;
-import org.apache.http.client.fluent.Response;
-import org.apache.http.impl.client.DefaultHttpClient;
 import reversegeocoding.processors.reversegeocoding.City;
 import reversegeocoding.processors.reversegeocoding.utils.GeoNamesEntity;
 import reversegeocoding.processors.reversegeocoding.utils.HttpResp;
 import reversegeocoding.processors.reversegeocoding.utils.HttpUtils;
 
 import java.io.IOException;
-import java.text.DecimalFormat;
-import java.text.NumberFormat;
 
-public class GeoNamesProvider extends GeoCodingProviderImpl {
+public class GeoNamesProvider implements GeoCodingProvider {
     private String baseUrl;
     private String username;
 
@@ -32,7 +26,7 @@ public class GeoNamesProvider extends GeoCodingProviderImpl {
                 ObjectMapper objectMapper = new ObjectMapper();
                 GeoNamesEntity entity = objectMapper.readValue(response.getContent().getContent(), GeoNamesEntity.class);
                 city.setCountry(entity.getCountryName());
-                city.setTimeOffset(prettyOffset(entity.getRawOffset()));
+                city.setTimezone((entity.getTimezoneId()));
                 return city;
             } else {
                 return null;

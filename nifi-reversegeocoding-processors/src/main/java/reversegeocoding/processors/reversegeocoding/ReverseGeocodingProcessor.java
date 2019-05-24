@@ -1,11 +1,6 @@
 package reversegeocoding.processors.reversegeocoding;
 
-import com.google.maps.GeocodingApi;
-import com.google.maps.TimeZoneApi;
 import com.google.maps.errors.ApiException;
-import com.google.maps.model.AddressComponentType;
-import com.google.maps.model.GeocodingResult;
-import com.google.maps.model.LatLng;
 import org.apache.nifi.annotation.behavior.ReadsAttribute;
 import org.apache.nifi.annotation.behavior.ReadsAttributes;
 import org.apache.nifi.annotation.behavior.WritesAttribute;
@@ -23,7 +18,6 @@ import org.apache.nifi.processor.util.StandardValidators;
 import reversegeocoding.processors.reversegeocoding.deserializers.CityDeserializer;
 import reversegeocoding.processors.reversegeocoding.providers.GeoCodingProvider;
 import reversegeocoding.processors.reversegeocoding.providers.GeoCodingProviderFactory;
-import reversegeocoding.processors.reversegeocoding.providers.GoogleAPIProvider;
 import reversegeocoding.processors.reversegeocoding.serializers.CitySerializer;
 import reversegeocoding.processors.reversegeocoding.serializers.StringSerializer;
 
@@ -47,15 +41,14 @@ public class ReverseGeocodingProcessor extends AbstractProcessor {
     * */
     public static final PropertyDescriptor GOOGLE_API_KEY_PROP = new PropertyDescriptor
             .Builder().name("GOOGLE_API_KEY_PROP")
-            .displayName("Google API key")
+            .displayName("apiKey")
             .description("Google API key to access Google Places services")
-            .allowableValues("GOOGLE_API_PROVIDER", "GEO_NAMES_PROVIDER")
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .build();
 
     public static final PropertyDescriptor GEO_NAMES_USERNAME_PROP = new PropertyDescriptor
             .Builder().name("GEO_NAMES_USERNAME_PROP")
-            .displayName("GeoNames username")
+            .displayName("username")
             .description("GeoNames username")
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .build();
@@ -65,6 +58,7 @@ public class ReverseGeocodingProcessor extends AbstractProcessor {
             .Builder().name("GEO_CODING_PROVIDER_PROP")
             .displayName("GeoCoding Provider")
             .description("GeoCoding Provider")
+            .allowableValues("GOOGLE_API_PROVIDER", "GEO_NAMES_PROVIDER")
             .required(true)
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .build();
@@ -133,6 +127,8 @@ public class ReverseGeocodingProcessor extends AbstractProcessor {
         descriptors.add(CSV_DELIMETER);
         descriptors.add(HAS_HEADER);
         descriptors.add(DISTRIBUTED_CACHE_SERVICE);
+        descriptors.add(GEO_NAMES_USERNAME_PROP);
+        descriptors.add(GOOGLE_API_KEY_PROP);
         this.descriptors = Collections.unmodifiableList(descriptors);
 
         final Set<Relationship> relationships = new HashSet<Relationship>();
@@ -222,7 +218,7 @@ public class ReverseGeocodingProcessor extends AbstractProcessor {
             }
 
             headerFields.add("country");
-            headerFields.add("timeOffset");
+            headerFields.add("timezone");
 
             //keep track of elements in csv
             HashMap<String, Integer> headerMap = parseCSVHeader(headerFields);
@@ -242,7 +238,7 @@ public class ReverseGeocodingProcessor extends AbstractProcessor {
 
                     City city = readCity(line, headerMap);
                     city = reverseGeoCoding(city, cacheProvider, geoCodingProvider, stringSerializer, citySerializer, cityDeserializer);
-                    csvWriter.writeLine(Arrays.asList(city.getName(), city.getLat().toString(), city.getLon().toString(), city.getCountry(), city.getTimeOffset()));
+                    csvWriter.writeLine(Arrays.asList(city.getName(), city.getLat().toString(), city.getLon().toString(), city.getCountry(), city.getTimezone()));
 
                 }
 

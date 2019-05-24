@@ -10,10 +10,8 @@ import com.google.maps.model.LatLng;
 import reversegeocoding.processors.reversegeocoding.City;
 
 import java.io.IOException;
-import java.text.DecimalFormat;
-import java.text.NumberFormat;
 
-public class GoogleAPIProvider extends GeoCodingProviderImpl {
+public class GoogleAPIProvider implements GeoCodingProvider {
 
     private GeoApiContext geoApiContext;
 
@@ -33,8 +31,8 @@ public class GoogleAPIProvider extends GeoCodingProviderImpl {
                 }
             }
             // Set time zone to the city
-            double offset = TimeZoneApi.getTimeZone(geoApiContext, coordinates).await().getRawOffset()/3600000.0;
-            city.setTimeOffset(prettyOffset(offset));
+            String timezone = TimeZoneApi.getTimeZone(geoApiContext, coordinates).await().getID();
+            city.setTimezone(timezone);
             return city;
 
         } catch (ApiException | InterruptedException | IOException e) {

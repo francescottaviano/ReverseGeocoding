@@ -1,10 +1,6 @@
 package reversegeocoding.processors.reversegeocoding;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-
 import java.io.Serializable;
-import java.text.DecimalFormat;
-import java.text.NumberFormat;
 
 /**
  * city class modeling cities provided by csv files
@@ -15,7 +11,7 @@ public class City implements Serializable {
     private Double lat;
     private Double lon;
     private String country;
-    private String timeOffset;
+    private String timezone;
 
     public City(String name, Double lat, Double lon) {
         this.name = name;
@@ -59,12 +55,12 @@ public class City implements Serializable {
         this.country = country;
     }
 
-    public String getTimeOffset() {
-        return timeOffset;
+    public String getTimezone() {
+        return timezone;
     }
 
-    public void setTimeOffset(String timeOffset) {
-        this.timeOffset = timeOffset;
+    public void setTimezone(String timezone) {
+        this.timezone = timezone;
     }
 
 }
