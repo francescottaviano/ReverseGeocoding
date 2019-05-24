@@ -8,6 +8,10 @@ import reversegeocoding.processors.reversegeocoding.utils.HttpUtils;
 
 import java.io.IOException;
 
+/**
+ * GeoNames Provider class
+ * */
+
 public class GeoNamesProvider implements GeoCodingProvider {
     private String baseUrl;
     private String username;

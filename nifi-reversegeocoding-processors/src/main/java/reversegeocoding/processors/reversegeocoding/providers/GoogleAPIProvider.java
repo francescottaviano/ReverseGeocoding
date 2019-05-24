@@ -11,6 +11,10 @@ import reversegeocoding.processors.reversegeocoding.City;
 
 import java.io.IOException;
 
+/**
+ * Google API Provider class
+ * */
+
 public class GoogleAPIProvider implements GeoCodingProvider {
 
     private GeoApiContext geoApiContext;

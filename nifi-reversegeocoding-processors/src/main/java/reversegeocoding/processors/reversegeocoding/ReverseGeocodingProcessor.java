@@ -25,11 +25,11 @@ import java.io.IOException;
 import java.util.*;
 
 /**
- * Google Places API NiFi Processor main class
- * It requires API Key as Property
+ * Reverse Geocoding NiFi Processor main class
+ * It requires Google API Key or GeoNames username as Property
  */
 
-@Tags({"jasmine", "reverse", "geocode", "country", "google", "places", "timezone"})
+@Tags({"jasmine", "reverse", "geocode", "country", "google", "places", "geonames", "timezone"})
 @CapabilityDescription("Reverse Geocoding")
 @SeeAlso({})
 @ReadsAttributes({@ReadsAttribute(attribute="", description="")})
@@ -46,6 +46,9 @@ public class ReverseGeocodingProcessor extends AbstractProcessor {
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .build();
 
+    /*
+     * GeoNames username property is required to use GeoNames services
+     * */
     public static final PropertyDescriptor GEO_NAMES_USERNAME_PROP = new PropertyDescriptor
             .Builder().name("GEO_NAMES_USERNAME_PROP")
             .displayName("username")
@@ -54,6 +57,9 @@ public class ReverseGeocodingProcessor extends AbstractProcessor {
             .build();
 
 
+    /*
+     * Provider property
+     * */
     public static final PropertyDescriptor GEO_CODING_PROVIDER_PROP = new PropertyDescriptor
             .Builder().name("GEO_CODING_PROVIDER_PROP")
             .displayName("GeoCoding Provider")
@@ -64,7 +70,8 @@ public class ReverseGeocodingProcessor extends AbstractProcessor {
             .build();
 
     /*
-     * CSV delimiter string
+     * CSV delimiter string property
+     * No default value is set
      * */
     public static final PropertyDescriptor CSV_DELIMETER = new PropertyDescriptor
             .Builder().name("CSV_DELIMITER")
@@ -75,7 +82,8 @@ public class ReverseGeocodingProcessor extends AbstractProcessor {
             .build();
 
     /*
-     * CSV header check
+     * CSV header boolean check property
+     * Default value is set to true
      * */
     public static final PropertyDescriptor HAS_HEADER = new PropertyDescriptor
             .Builder().name("HAS_HEADER")
@@ -87,7 +95,9 @@ public class ReverseGeocodingProcessor extends AbstractProcessor {
             .addValidator(StandardValidators.BOOLEAN_VALIDATOR)
             .build();
 
-    // Identifies the distributed map cache client
+    /*
+     * Distributed cache service property
+     * */
     public static final PropertyDescriptor DISTRIBUTED_CACHE_SERVICE = new PropertyDescriptor.Builder()
             .name("Distributed Cache Service")
             .description("The Controller Service that is used to cache flow files")
@@ -95,24 +105,28 @@ public class ReverseGeocodingProcessor extends AbstractProcessor {
             .identifiesControllerService(DistributedMapCacheClient.class)
             .build();
 
+    /*
+     * Success relationship
+     * */
     public static final Relationship SUCCESS_RELATIONSHIP = new Relationship.Builder()
             .name("success")
             .description("Success Relationship")
             .build();
 
+    /*
+     * Failure relationship
+     * */
     public static final Relationship FAILURE_RELATIONSHIP = new Relationship.Builder()
             .name("failure")
             .description("Failure Relationship")
             .build();
 
     private List<PropertyDescriptor> descriptors;
-
     private Set<Relationship> relationships;
 
-    /**
+    /*
      * processor specific attributes
      * */
-    // Get component properties
     private String apiKey;
     private String geoNamesUsername;
     private String csvDelimiter;
@@ -123,6 +137,10 @@ public class ReverseGeocodingProcessor extends AbstractProcessor {
     @Override
     protected void init(final ProcessorInitializationContext context) {
         final List<PropertyDescriptor> descriptors = new ArrayList<PropertyDescriptor>();
+
+        /*
+         * Adding properties to descriptors list
+         * */
         descriptors.add(GEO_CODING_PROVIDER_PROP);
         descriptors.add(CSV_DELIMETER);
         descriptors.add(HAS_HEADER);
@@ -131,6 +149,9 @@ public class ReverseGeocodingProcessor extends AbstractProcessor {
         descriptors.add(GOOGLE_API_KEY_PROP);
         this.descriptors = Collections.unmodifiableList(descriptors);
 
+        /*
+         * Adding relationships to relationships set
+         * */
         final Set<Relationship> relationships = new HashSet<Relationship>();
         relationships.add(SUCCESS_RELATIONSHIP);
         relationships.add(FAILURE_RELATIONSHIP);
@@ -150,7 +171,7 @@ public class ReverseGeocodingProcessor extends AbstractProcessor {
     @OnScheduled
     public void onScheduled(final ProcessContext context) {
         /*
-         * Reverse Geocoding Google service to provide
+         * Reverse Geocoding service to provide
          * country and timezone information from city coordinates.
          */
         buildGeocodingProvider(context);
@@ -159,7 +180,7 @@ public class ReverseGeocodingProcessor extends AbstractProcessor {
         csvDelimiter = context.getProperty(CSV_DELIMETER).getValue();
         hasHeader = context.getProperty(HAS_HEADER).asBoolean();
 
-        // build cache provider
+        // Build cache provider
         DistributedMapCacheClient cache = context.getProperty(DISTRIBUTED_CACHE_SERVICE)
                 .asControllerService(DistributedMapCacheClient.class);
 
@@ -169,6 +190,10 @@ public class ReverseGeocodingProcessor extends AbstractProcessor {
 
     }
 
+    /**
+     * Build geocoding provider
+     * @param context
+     */
     private void buildGeocodingProvider(ProcessContext context) {
         GeoCodingProviderFactory.ProviderType providerType = GeoCodingProviderFactory.ProviderType
                 .valueOf(context.getProperty(GEO_CODING_PROVIDER_PROP).getValue());
@@ -195,6 +220,8 @@ public class ReverseGeocodingProcessor extends AbstractProcessor {
     @Override
     public void onTrigger(final ProcessContext context, final ProcessSession session) throws ProcessException {
         FlowFile flowFile = session.get();
+
+        // flowFile checker
         if ( flowFile == null ) {
             return;
         }
@@ -217,20 +244,21 @@ public class ReverseGeocodingProcessor extends AbstractProcessor {
                 exitWithFailure(flowFile, session);
             }
 
+            // Adding header fields
             headerFields.add("country");
             headerFields.add("timezone");
 
-            //keep track of elements in csv
+            // Keep track of elements in csv
             HashMap<String, Integer> headerMap = parseCSVHeader(headerFields);
 
             List<String> line = null;
             csvWriter.writeLine(headerFields);
 
-            //create serializers
+            // Create serializers
             StringSerializer stringSerializer = new StringSerializer();
             CitySerializer citySerializer = new CitySerializer();
 
-            //create deserializers
+            // Create deserializers
             CityDeserializer cityDeserializer = new CityDeserializer();
 
             try {
